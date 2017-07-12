@@ -1,26 +1,11 @@
 #!/bin/bash
-# This script automates the NC classification and environment group setup for the VRO plugin provisioning workflow
-# Run this as root on your master
 # Note: this script does not randomize uuid for the classification group it creates, so it will create/replace the same group everytime instead of creating a new group
-# This script assumes it is being run on a freshly installed master that is not using code manager.
-#
-# User configuration
-#
-echo Puppet Master Setup Script
-echo --------------------------
-echo This script expects to be run from puppet-vro-starter_content directory. If run from a different directory, the script will fail.
-echo This script also assumes it is being run on a freshly installed master that is not using code manager.
-echo --------------------------
-
-alternate_environment=dev
 autosign_example_class=autosign_example
-vro_user_class=vro_plugin_user
-vro_sshd_class=vro_plugin_sshd
-
+alternate_environment=dev
 all_nodes_id='00000000-0000-4000-8000-000000000000'
 roles_group_id='235a97b3-949b-48e0-8e8a-000000000666'
 dev_env_group_id='235a97b3-949b-48e0-8e8a-000000000888'
-autosign_and_user_group_id='235a97b3-949b-48e0-8e8a-000000000999'
+autosign_group_id='235a97b3-949b-48e0-8e8a-000000000999'
 
 #
 # Configuration we can detect
@@ -41,31 +26,12 @@ error_checking()
       exit 1
   fi
 
-  # Check to see if script is running from puppet-vro-starter_content directory
-  if [[ $PWD != *"puppet-vro-starter_content"* ]]
-  then
-    echo "ERROR:  You must run 'bash scripts/vra_nc_setup.sh' inside the 'puppet-vro-starter_content' directory.";
-    exit 1
-  fi
-
   # Check to see if script is being run on a puppet master
   if [ ! -f /opt/puppetlabs/server/bin/puppetserver ]; then
     echo "ERROR: This script should only be run by the root user or via sudo."
     exit 1
   fi
 
-  #
-  # Check if code manager is being used
-  #
-  curl -s -X GET \ -H "Content-Type: application/json" \
-  --cert   $cert \
-  --key    $key \
-  --cacert $cacert \
-  "https://$master_hostname:4433/classifier-api/v1/groups" | grep -q code_manager_auto_configure
-  if [ $? -eq 0 ]; then
-    echo "ERROR: It appears that code manager is being used. This script can not continue."
-    exit 1
-  fi
 }
 
 error_checking
@@ -89,44 +55,16 @@ echo "Backing up existing contents of /etc/puppetlabs/code to $date_string"
 cp -R /etc/puppetlabs/code /etc/puppetlabs/code_backup_$date_string
 
 #
-# Copying starter content and create an alternate puppet environment in addition to production
+# Create an "Autosign" classification group to set up autosign example and vro-plugin-user
 #
-echo 'Copying vRO starter content repo into /etc/puppetlabs/code/environments'
-mkdir -p /etc/puppetlabs/code/environments/$alternate_environment
-rm -rf /etc/puppetlabs/code/environments/$alternate_environment/*
-cp -R * /etc/puppetlabs/code/environments/$alternate_environment
-
-# Put a copy in production
-echo "Duplicating $alternate_environment contents into production"
-rm -rf /etc/puppetlabs/code/environments/production/
-cp -R /etc/puppetlabs/code/environments/$alternate_environment /etc/puppetlabs/code/environments/production
-#
-# Tell the NC to refresh its cache so that the classes we just installed are available
-#
-echo "Refreshing NC class lists for production and $alternate_environment puppet environments"
-curl -s -X POST -H "Content-Type: application/json" \
---key    $key \
---cert   $cert \
---cacert $cacert \
-https://$master_hostname:4433/classifier-api/v1/update-classes?environment=production
-[ "$?" = 0 ] && echo "Successful refresh of production environment."
-curl -s -X POST -H "Content-Type: application/json" \
---key    $key \
---cert   $cert \
---cacert $cacert \
-https://$master_hostname:4433/classifier-api/v1/update-classes?environment=$alternate_environment
-[ "$?" = 0 ] && echo "Successful refresh of $alternate_environment environment."
-#
-# Create an "Autosign and vRO Plugin User" classification group to set up autosign example and vro-plugin-user
-#
-echo "Creating the Autosign and vRO Plugin User and sshd config group"
+echo "Creating the Autosign config group"
 curl -s -X PUT -H 'Content-Type: application/json' \
   --key $key \
   --cert $cert \
   --cacert $cacert \
   -d '
   {
-    "name": "Autosign and vRO Plugin User and sshd config",
+    "name": "Autosign config",
     "parent": "'$all_nodes_id'",
     "rule":
       [ "and",
@@ -135,9 +73,9 @@ curl -s -X PUT -H 'Content-Type: application/json' \
           "'$master_hostname'"
         ]
       ],
-    "classes": { "'$autosign_example_class'": {}, "'$vro_user_class'": {}, "'$vro_sshd_class'": {} }
+    "classes": { "'$autosign_example_class'": {} }
   }' \
-  https://$master_hostname:4433/classifier-api/v1/groups/$autosign_and_user_group_id | python -m json.tool
+  https://$master_hostname:4433/classifier-api/v1/groups/$autosign_group_id | python -m json.tool
 echo
 #
 # Add 64 bit Windows agent installer to pe_repo
@@ -170,9 +108,9 @@ curl -s -X PUT -H 'Content-Type: application/json' \
   https://$master_hostname:4433/classifier-api/v1/groups/$roles_group_id | python -m json.tool
 echo
 #
-# Create an environment group for an alternative puppet environment, e.g. dev puppet environment
+# Create a role groups for each role class
 #
-for file in /etc/puppetlabs/code/environments/$alternate_environment/site/role/manifests/*; do
+for file in /etc/puppetlabs/code/environments/production/site/role/manifests/*; do
   basefilename=$(basename "$file")
   role_class="role::${basefilename%.*}"
   echo "Creating the \"$role_class\" classification group"
@@ -185,7 +123,7 @@ for file in /etc/puppetlabs/code/environments/$alternate_environment/site/role/m
   {
     "name": "'$role_class'",
     "parent": "'$roles_group_id'",
-    "environment": "'$alternate_environment'",
+    "environment": "production",
     "rule":
      [ "and",
        [ "=",
@@ -247,7 +185,3 @@ curl -s -X PUT -H "Content-type: application/json" \
 }' \
 https://$master_hostname:4433/classifier-api/v1/groups/$agent_specified_env_group_id | python -m json.tool
 echo
-#
-# Ensure that the puppet-strings gem is installed for role class summaries in Puppet component of vRA
-#
-/opt/puppetlabs/bin/puppet resource package puppet-strings provider=puppet_gem ensure=latest
