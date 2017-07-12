@@ -3,12 +3,19 @@
 ## Include augeasproviders_core from forge or github.
 #### https://github.com/hercules-team/augeasproviders_core
 
-class vro_plugin_sshd {
+class profile::sshd {
 
-  ## If you are not using root ssh login from VRO to Puppet Enterprise then comment out this resource.
+  package { 'sshd':
+    ensure => installed,
+  }
+
+  service { 'sshd':
+    ensure => running,
+  }
+
   sshd_config { "PermitRootLogin":
     ensure => present,
-    value  => "yes",
+    value  => "no",
   }
 
   sshd_config { "PasswordAuthentication":
