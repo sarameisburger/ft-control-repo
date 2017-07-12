@@ -21,6 +21,10 @@ mod 'puppetlabs-registry', '1.1.3'
 mod 'puppetlabs-inifile', '1.6.0'
 mod 'puppetlabs-puppetserver_gem', '0.2.0'
 mod 'puppetlabs-ntp', '6.2.0'
+mod 'puppet-selinux', '1.2.0'
+mod 'rnelson0-domain_join', '0.5.0'
+mod 'trlinkin-domain_membership', '1.1.2'
+mod 'puppetlabs-tagmail', '2.2.0'
 
 # Forge Community Modules
 
