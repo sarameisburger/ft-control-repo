@@ -49,7 +49,7 @@ fi
 sleep 2
 
 export BEAKER_PUPPET_AGENT_VERSION=${ARGS[1]}
-export GEM_SOURCE=http://rubygems.delivery.puppetlabs.net
+export GEM_SOURCE=https://artifactory.delivery.puppetlabs.net/artifactory/api/gems/rubygems/
 
 bundle install --without build development test --path .bundle/gems
 
