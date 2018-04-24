@@ -12,7 +12,7 @@ chocolatey_package_manifest = <<-PP
   package { "#{package_name}":
     ensure  => present,
     provider => chocolatey,
-    source => 'http://nexus.delivery.puppetlabs.net/service/local/nuget/choco-pipeline-tests/'
+    source => 'https://artifactory.delivery.puppetlabs.net/artifactory/api/nuget/nuget/choco-pipeline-tests/'
   }
 PP
 
